@@ -8,12 +8,12 @@ import os
 # -------------------------------
 ARCHIVOS = {
     "lv": {  # lunes a viernes
-        "ida": "data/TREN_LUNES_A_VIERNES_IDA.XLS",
-        "vuelta": "data/TREN_LUNES_A_VIERNES_VUELTA.XLS"
+        "ida": "data/TREN LUNES A VIERNES IDA.XLS",
+        "vuelta": "data/TREN LUNES A VIERNES VUELTA.XLS"
     },
     "sd": {  # sábado y domingo
-        "ida": "data/TREN_SABADO_DOMINGO_IDA.XLS",
-        "vuelta": "data/TREN_SABADO_DOMINGO_VUELTA.XLS"
+        "ida": "data/TREN SABADO DOMINGO IDA.XLS",
+        "vuelta": "data/TREN SABADO DOMINGO VUELTA.XLS"
     }
 }
 
