@@ -8,11 +8,11 @@ from datetime import datetime
 # ARCHIVOS DE HORARIOS
 # -------------------------------
 ARCHIVOS = {
-    "lv": {  # Lunes a Viernes
+    "lv": {
         "ida": "data/TREN LUNES A VIERNES IDA.XLS",
         "vuelta": "data/TREN LUNES A VIERNES VUELTA.XLS"
     },
-    "sd": {  # Sábado y Domingo
+    "sd": {
         "ida": "data/TREN SABADO DOMINGO IDA.XLS",
         "vuelta": "data/TREN SABADO DOMINGO VUELTA.XLS"
     }
@@ -29,7 +29,7 @@ def leer_excel_a_json(path):
     return df.to_dict(orient="records")
 
 # -------------------------------
-# CARGAR TODOS LOS HORARIOS AL INICIAR
+# CARGAR HORARIOS
 # -------------------------------
 DATOS = {}
 for dia, sentidos in ARCHIVOS.items():
@@ -38,7 +38,7 @@ for dia, sentidos in ARCHIVOS.items():
         DATOS[dia][sentido] = leer_excel_a_json(path)
 
 # -------------------------------
-# FUNCIÓN PARA LISTAR TODAS LAS ESTACIONES
+# LISTAR ESTACIONES
 # -------------------------------
 def listar_estaciones():
     estaciones_set = set()
@@ -49,5 +49,81 @@ def listar_estaciones():
     return sorted(estaciones_set)
 
 # -------------------------------
-# API FASTAPI
+# APP FASTAPI
 # -------------------------------
+app = FastAPI(title="Horarios de Tren", version="5.0")
+
+@app.get("/tren")
+def get_tren(
+    dia: str = Query(...),
+    sentido: str = Query(...),
+    origen: str = Query(None),
+    destino: str = Query(None)
+):
+    dia = dia.lower()
+    sentido = sentido.lower()
+    if dia not in DATOS or sentido not in DATOS[dia]:
+        return JSONResponse({"error": "Parámetros inválidos"}, status_code=400)
+    horarios = DATOS[dia][sentido]
+    if origen and destino:
+        filtrados = []
+        for fila in horarios:
+            if origen in fila and destino in fila:
+                filtrados.append({
+                    "origen": origen,
+                    "hora_origen": fila[origen],
+                    "destino": destino,
+                    "hora_destino": fila[destino]
+                })
+        return JSONResponse({"tren": "Lunes a Viernes" if dia=="lv" else "Sábado y Domingo",
+                             "sentido": sentido.capitalize(),
+                             "horarios_filtrados": filtrados})
+    return JSONResponse({"tren": "Lunes a Viernes" if dia=="lv" else "Sábado y Domingo",
+                         "sentido": sentido.capitalize(),
+                         "horarios": horarios})
+
+@app.get("/tren/estaciones")
+def get_estaciones():
+    return JSONResponse({"estaciones": listar_estaciones()})
+
+@app.get("/tren/proximo")
+def get_proximo_tren(
+    dia: str = Query(...),
+    sentido: str = Query(...),
+    origen: str = Query(...),
+    destino: str = Query(...),
+    hora: str = Query(None)
+):
+    dia = dia.lower()
+    sentido = sentido.lower()
+    if dia not in DATOS or sentido not in DATOS[dia]:
+        return JSONResponse({"error": "Parámetros inválidos"}, status_code=400)
+
+    horarios = DATOS[dia][sentido]
+    hora_minima = datetime.now().time() if not hora else datetime.strptime(hora, "%H:%M").time()
+
+    for fila in horarios:
+        if origen in fila and destino in fila:
+            try:
+                hora_origen = datetime.strptime(fila[origen], "%H:%M").time()
+            except:
+                continue
+            if hora_origen >= hora_minima:
+                return JSONResponse({
+                    "tren": "Lunes a Viernes" if dia=="lv" else "Sábado y Domingo",
+                    "sentido": sentido.capitalize(),
+                    "proximo_tren": {
+                        "origen": origen,
+                        "hora_origen": fila[origen],
+                        "destino": destino,
+                        "hora_destino": fila[destino]
+                    }
+                })
+    return JSONResponse({"mensaje": "No hay trenes disponibles a partir de la hora indicada"})
+
+# -------------------------------
+# TEST LOCAL
+# -------------------------------
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=10000)
