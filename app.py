@@ -8,77 +8,74 @@ import os
 # -------------------------------
 ARCHIVOS = {
     "lv": {  # lunes a viernes
-        "ida": "data/TREN_LUNES_A_VIERNES_IDA.xls",
-        "vuelta": "data/TREN_LUNES_A_VIERNES_VUELTA.xls"
+        "ida": "data/TREN_LUNES_A_VIERNES_IDA.XLS",
+        "vuelta": "data/TREN_LUNES_A_VIERNES_VUELTA.XLS"
     },
     "sd": {  # sábado y domingo
-        "ida": "data/TREN_SABADO_DOMINGO_IDA.xls",
-        "vuelta": "data/TREN_SABADO_DOMINGO_VUELTA.xls"
+        "ida": "data/TREN_SABADO_DOMINGO_IDA.XLS",
+        "vuelta": "data/TREN_SABADO_DOMINGO_VUELTA.XLS"
     }
 }
 
 # -------------------------------
-# FUNCIÓN PARA LEER XLS → JSON
+# Cargar todos los horarios al iniciar
 # -------------------------------
-def cargar_horarios(path: str, dia: str, sentido: str):
+def leer_excel_a_json(path):
     if not os.path.exists(path):
         return {"error": f"Archivo {path} no encontrado"}
 
-    df = pd.read_excel(path)
+    df = pd.read_excel(path, header=0)
+    df = df.astype(str)
+    horarios = df.to_dict(orient="records")
+    return horarios
 
-    # La primera fila son las estaciones
-    df.columns = df.iloc[0]
-    df = df.drop(0).reset_index(drop=True)
-
-    horarios = []
-    for _, row in df.iterrows():
-        salida = row.iloc[0]  # primera columna = hora base
-        estaciones = row.to_dict()
-        estaciones.pop(df.columns[0])  # quitamos la hora de salida
-
-        horarios.append({
-            "salida": str(salida),
-            "estaciones": estaciones
-        })
-
-    nombre_dia = "Lunes a Viernes" if dia == "lv" else "Sábado y Domingo"
-    return {
-        "tren": nombre_dia,
-        "sentido": sentido.capitalize(),
-        "horarios": horarios
-    }
+# Diccionario para almacenar todos los horarios
+DATOS = {}
+for dia, sentidos in ARCHIVOS.items():
+    DATOS[dia] = {}
+    for sentido, path in sentidos.items():
+        DATOS[dia][sentido] = leer_excel_a_json(path)
 
 # -------------------------------
-# FUNCIÓN PARA LISTAR ESTACIONES
+# Función para listar todas las estaciones
 # -------------------------------
 def listar_estaciones():
     estaciones_set = set()
-
-    for dia, sentidos in ARCHIVOS.items():
-        for sentido, path in sentidos.items():
-            if not os.path.exists(path):
-                continue
-            df = pd.read_excel(path)
-            df.columns = df.iloc[0]  # primera fila = estaciones
-            estaciones = list(df.columns[1:])  # quitamos la primera col (hora salida)
-            estaciones_set.update(estaciones)
-
+    for dia, sentidos in DATOS.items():
+        for sentido, horarios in sentidos.items():
+            for fila in horarios:
+                estaciones_set.update(fila.keys())
     return sorted(estaciones_set)
 
 # -------------------------------
 # API FASTAPI
 # -------------------------------
-app = FastAPI(title="Horarios de Tren", version="1.1")
+app = FastAPI(title="Horarios de Tren", version="2.0")
 
 @app.get("/tren/{dia}/{sentido}")
 def get_tren(dia: str, sentido: str):
     dia = dia.lower()
     sentido = sentido.lower()
 
-    if dia not in ARCHIVOS or sentido not in ARCHIVOS[dia]:
+    if dia not in DATOS or sentido not in DATOS[dia]:
         return JSONResponse(
             content={"error": "Parámetros inválidos. Usa /tren/{lv|sd}/{ida|vuelta}"},
             status_code=400
         )
 
-    path = ARCHIVOS[di]()
+    return JSONResponse(content={
+        "tren": "Lunes a Viernes" if dia=="lv" else "Sábado y Domingo",
+        "sentido": sentido.capitalize(),
+        "horarios": DATOS[dia][sentido]
+    })
+
+@app.get("/tren/estaciones")
+def get_estaciones():
+    return JSONResponse(content={"estaciones": listar_estaciones()})
+
+# -------------------------------
+# TEST LOCAL
+# -------------------------------
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
