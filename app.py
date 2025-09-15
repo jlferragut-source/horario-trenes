@@ -32,7 +32,7 @@ def cargar_horarios(path: str, dia: str, sentido: str):
 
     horarios = []
     for _, row in df.iterrows():
-        salida = row.iloc[0]  # asumimos que la primera columna es la hora
+        salida = row.iloc[0]  # primera columna = hora base
         estaciones = row.to_dict()
         estaciones.pop(df.columns[0])  # quitamos la hora de salida
 
@@ -49,9 +49,26 @@ def cargar_horarios(path: str, dia: str, sentido: str):
     }
 
 # -------------------------------
+# FUNCIÓN PARA LISTAR ESTACIONES
+# -------------------------------
+def listar_estaciones():
+    estaciones_set = set()
+
+    for dia, sentidos in ARCHIVOS.items():
+        for sentido, path in sentidos.items():
+            if not os.path.exists(path):
+                continue
+            df = pd.read_excel(path)
+            df.columns = df.iloc[0]  # primera fila = estaciones
+            estaciones = list(df.columns[1:])  # quitamos la primera col (hora salida)
+            estaciones_set.update(estaciones)
+
+    return sorted(estaciones_set)
+
+# -------------------------------
 # API FASTAPI
 # -------------------------------
-app = FastAPI(title="Horarios de Tren", version="1.0")
+app = FastAPI(title="Horarios de Tren", version="1.1")
 
 @app.get("/tren/{dia}/{sentido}")
 def get_tren(dia: str, sentido: str):
@@ -64,13 +81,4 @@ def get_tren(dia: str, sentido: str):
             status_code=400
         )
 
-    path = ARCHIVOS[dia][sentido]
-    data = cargar_horarios(path, dia, sentido)
-    return JSONResponse(content=data)
-
-# -------------------------------
-# TEST LOCAL
-# -------------------------------
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    path = ARCHIVOS[di]()
