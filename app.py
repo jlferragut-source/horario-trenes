@@ -1,35 +1,36 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
 import pandas as pd
 import os
+from datetime import datetime
 
 # -------------------------------
-# MAPA DE ARCHIVOS
+# ARCHIVOS DE HORARIOS
 # -------------------------------
 ARCHIVOS = {
-    "lv": {  # lunes a viernes
-        "ida": "data/TREN LUNES A VIERNES IDA.xls",
-        "vuelta": "data/TREN LUNES A VIERNES VUELTA.xls"
+    "lv": {  # Lunes a Viernes
+        "ida": "data/TREN LUNES A VIERNES IDA.XLS",
+        "vuelta": "data/TREN LUNES A VIERNES VUELTA.XLS"
     },
-    "sd": {  # sábado y domingo
-        "ida": "data/TREN SABADO DOMINGO IDA.xls",
-        "vuelta": "data/TREN SABADO DOMINGO VUELTA.xls"
+    "sd": {  # Sábado y Domingo
+        "ida": "data/TREN SABADO DOMINGO IDA.XLS",
+        "vuelta": "data/TREN SABADO DOMINGO VUELTA.XLS"
     }
 }
 
 # -------------------------------
-# Cargar todos los horarios al iniciar
+# FUNCIÓN PARA LEER XLS A JSON
 # -------------------------------
 def leer_excel_a_json(path):
     if not os.path.exists(path):
         return {"error": f"Archivo {path} no encontrado"}
-
     df = pd.read_excel(path, header=0)
     df = df.astype(str)
-    horarios = df.to_dict(orient="records")
-    return horarios
+    return df.to_dict(orient="records")
 
-# Diccionario para almacenar todos los horarios
+# -------------------------------
+# CARGAR TODOS LOS HORARIOS AL INICIAR
+# -------------------------------
 DATOS = {}
 for dia, sentidos in ARCHIVOS.items():
     DATOS[dia] = {}
@@ -37,7 +38,7 @@ for dia, sentidos in ARCHIVOS.items():
         DATOS[dia][sentido] = leer_excel_a_json(path)
 
 # -------------------------------
-# Función para listar todas las estaciones
+# FUNCIÓN PARA LISTAR TODAS LAS ESTACIONES
 # -------------------------------
 def listar_estaciones():
     estaciones_set = set()
@@ -50,32 +51,3 @@ def listar_estaciones():
 # -------------------------------
 # API FASTAPI
 # -------------------------------
-app = FastAPI(title="Horarios de Tren", version="2.0")
-
-@app.get("/tren/{dia}/{sentido}")
-def get_tren(dia: str, sentido: str):
-    dia = dia.lower()
-    sentido = sentido.lower()
-
-    if dia not in DATOS or sentido not in DATOS[dia]:
-        return JSONResponse(
-            content={"error": "Parámetros inválidos. Usa /tren/{lv|sd}/{ida|vuelta}"},
-            status_code=400
-        )
-
-    return JSONResponse(content={
-        "tren": "Lunes a Viernes" if dia=="lv" else "Sábado y Domingo",
-        "sentido": sentido.capitalize(),
-        "horarios": DATOS[dia][sentido]
-    })
-
-@app.get("/tren/estaciones")
-def get_estaciones():
-    return JSONResponse(content={"estaciones": listar_estaciones()})
-
-# -------------------------------
-# TEST LOCAL
-# -------------------------------
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
